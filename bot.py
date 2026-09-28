@@ -79,7 +79,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
     async def from_url(cls, url, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
         
-        # لێرەدا دڵنیایی دەبینەوە کە گەڕانەکە ڕاستەوخۆ لینکی ڕەسەن دەهێنێت
         def extract():
             info = ytdl.extract_info(url, download=False)
             if 'entries' in info:
@@ -106,7 +105,7 @@ async def get_muted_role(guild):
         return None
 
 # =========================================================
-# BOT READY
+# BOT READY & VOICE STATE LISTENER
 # =========================================================
 
 @bot.event
@@ -120,6 +119,12 @@ async def on_ready():
 
     for guild in bot.guilds:
         await get_muted_role(guild)
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.id == bot.user.id:
+        if after.channel is None:
+            pass
 
 # =========================================================
 # MEMBER JOIN
@@ -169,9 +174,10 @@ async def gorani(interaction: discord.Interaction, query: str):
 
     try:
         if voice_client is None:
-            voice_client = await voice_channel.connect()
+            voice_client = await voice_channel.connect(self_deaf=True)
         elif voice_client.channel != voice_channel:
             await voice_client.move_to(voice_channel)
+            voice_client.self_deaf = True
     except Exception as e:
         return await interaction.followup.send(f"❌ هەڵەی پەیوەندیکردن بە ڤۆیس: `{e}`")
 
