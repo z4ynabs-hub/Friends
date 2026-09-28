@@ -67,7 +67,6 @@ async def get_muted_role(guild):
 async def on_ready():
     print(f"Bot is online as {bot.user}")
     try:
-        # Sync slash commands globally or to guilds if needed
         await bot.tree.sync()
         print("Slash commands synced successfully.")
     except Exception as e:
@@ -209,7 +208,7 @@ async def mute(ctx, member: discord.Member = None):
         except:
             pass
 
-        msg = await ctx.send(f"🔇 {member.mention} لە هەموو چەناڵەکانی سێرڤەرەکەدا چاتی قفڵ کرا.")
+        msg = await ctx.send(f"🔇 {member.mention} mute کرا.")
         await msg.delete(delay=5)
 
     except discord.Forbidden:
@@ -260,7 +259,7 @@ async def unmute(ctx, member: discord.Member = None):
         except:
             pass
 
-        msg = await ctx.send(f"🔊 {member.mention} ئەنمیوت کرا و چاتی بۆ کرایەوە.")
+        msg = await ctx.send(f"🔊 {member.mention} mute لادرا.")
         await msg.delete(delay=5)
 
     except discord.Forbidden:
@@ -368,7 +367,7 @@ async def seuafraaaRyaaa(ctx):
         await ctx.send("❌ بۆتەکە Manage Roles ـی نییە یان ڕۆڵەکان لە سەرووی ڕۆڵی بۆتەکەن.", delete_after=6)
 
 # =========================================================
-# DYNAMIC COLOR SYSTEM (/rangi-role)
+# DYNAMIC COLOR SYSTEM (/rangi-role) - ADMIN ONLY
 # =========================================================
 
 async def rangi_role_autocomplete(
@@ -379,28 +378,26 @@ async def rangi_role_autocomplete(
     if not guild:
         return []
     
-    # Get all roles except @everyone and managed roles (like bot roles)
     roles = [
         role for role in guild.roles 
         if role != guild.default_role and not role.managed
     ]
     
-    # Filter based on user typing
     filtered = [
         discord.app_commands.Choice(name=role.name, value=str(role.id))
         for role in roles
         if current.lower() in role.name.lower()
     ]
     
-    # Discord limits autocomplete choices to 25 max
     return filtered[:25]
 
-@bot.tree.command(name="rangirole", description="گۆڕینی ڕەنگی ڕۆڵێک بە شێوەی خۆکارانە")
+@bot.tree.command(name="rangi-role", description="گۆڕینی ڕەنگی ڕۆڵ (تەنها بۆ ادمین)")
 @discord.app_commands.describe(
-role="ڕۆڵەکە هەڵبژێرە",
-color="ڕەنگی نوێ بە شێوەی Hex (بۆ نموونە: #FF0000)"
+    role="ڕۆڵەکە هەڵبژێرە",
+    color="ڕەنگی نوێ بە شێوەی Hex (بۆ نموونە: #FF0000)"
 )
 @discord.app_commands.autocomplete(role=rangi_role_autocomplete)
+@discord.app_commands.checks.has_permissions(administrator=True)
 async def rangi_role(interaction: discord.Interaction, role: str, color: str):
     await interaction.response.defer(thinking=True, ephemeral=True)
     
@@ -417,10 +414,9 @@ async def rangi_role(interaction: discord.Interaction, role: str, color: str):
     if target_role is None:
         return await interaction.followup.send("❌ ڕۆڵەکە لە سێرڤەرەکەدا نەدۆزرایەوە یان سڕاوەتەوە.")
 
-    # Check if the user has the role
-    member = guild.get_member(interaction.user.id)
-    if member is None or target_role not in member.roles:
-        return await interaction.followup.send("❌ تۆ ئەم ڕۆڵەت نییە بۆ ئەوەی ڕەنگەکەی بگۆڕیت.")
+    # Check if target role is higher than or equal to admin's top role (unless owner)
+    if interaction.user.id != guild.owner_id and target_role >= interaction.user.top_role:
+        return await interaction.followup.send("❌ ناتوانیت ڕەنگی ڕۆڵێک بگۆڕیت کە یەکسانە یان بەرزترە لە ڕۆڵی خۆت.")
 
     # Validate Hex Color format
     if not color.startswith("#") or len(color) != 7:
@@ -442,6 +438,19 @@ async def rangi_role(interaction: discord.Interaction, role: str, color: str):
         await interaction.followup.send("❌ بۆتەکە ناتوانێت ئەم ڕۆڵە دەستکاری بکات.")
     except discord.HTTPException:
         await interaction.followup.send("❌ هەڵەیەک لە Discord ڕوویدا.")
+
+@rangi_role.error
+async def rangi_role_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    if isinstance(error, discord.app_commands.CheckFailure):
+        if interaction.response.is_done():
+            await interaction.followup.send("❌ تەنها ادمینەکان دەتوانن ئەم فەرمانە بەکاربهێنن.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ تەنها ادمینەکان دەتوانن ئەم فەرمانە بەکاربهێنن.", ephemeral=True)
+    else:
+        if interaction.response.is_done():
+            await interaction.followup.send("❌ هەڵەیەک ڕوویدا.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ هەڵەیەک ڕوویدا.", ephemeral=True)
 
 # =========================================================
 # COMMAND ERRORS
