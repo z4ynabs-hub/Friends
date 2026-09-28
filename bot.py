@@ -58,11 +58,12 @@ ytdl_format_options = {
     'default_search': 'auto',
     'source_address': '0.0.0.0',
     'quiet': True,
+    'extract_flat': False,
 }
 
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
+    'options': '-vn -b:a 192k'
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -77,12 +78,17 @@ class YTDLSource(discord.PCMVolumeTransformer):
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
         
-        if 'entries' in data:
-            data = data['entries'][0]
+        # لێرەدا دڵنیایی دەبینەوە کە گەڕانەکە ڕاستەوخۆ لینکی ڕەسەن دەهێنێت
+        def extract():
+            info = ytdl.extract_info(url, download=False)
+            if 'entries' in info:
+                info = info['entries'][0]
+            return info
 
-        filename = data['url'] if stream else ytdl.prepare_filename(data)
+        data = await loop.run_in_executor(None, extract)
+        filename = data.get('url')
+        
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 # =========================================================
@@ -159,23 +165,20 @@ async def gorani(interaction: discord.Interaction, query: str):
     voice_channel = interaction.user.voice.channel
     voice_client = interaction.guild.voice_client
     
-    if voice_client is None:
-        try:
-            voice_client = await voice_channel.connect()
-        except Exception as e:
-            return await interaction.response.send_message(f"❌ هەڵەی پەیوەندیکردن بە ڤۆیس: `{e}`", ephemeral=True)
-    elif voice_client.channel != voice_channel:
-        try:
-            await voice_client.move_to(voice_channel)
-        except Exception as e:
-            return await interaction.response.send_message(f"❌ نەتوانرا بگوازرێتەوە بۆ ڤۆیسەکە: `{e}`", ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
-    await interaction.response.send_message(f"🔍 خەریکی گەڕان و هێنانی گۆرانیەکەم: `{query}` ...")
+    try:
+        if voice_client is None:
+            voice_client = await voice_channel.connect()
+        elif voice_client.channel != voice_channel:
+            await voice_client.move_to(voice_channel)
+    except Exception as e:
+        return await interaction.followup.send(f"❌ هەڵەی پەیوەندیکردن بە ڤۆیس: `{e}`")
 
     try:
         player = await YTDLSource.from_url(query, loop=bot.loop, stream=True)
     except Exception as e:
-        return await interaction.followup.send(f"❌ هەڵەیەک ڕوویدا لە دابەزاندنی گۆرانیەکە: `{e}`")
+        return await interaction.followup.send(f"❌ هەڵەیەک ڕوویدا لە هێنانی گۆرانیەکە: `{e}`")
 
     if voice_client.is_playing():
         voice_client.stop()
