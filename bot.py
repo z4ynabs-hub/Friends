@@ -24,11 +24,6 @@ bot = commands.Bot(
 
 WELCOME_CHANNEL_ID = 1550619956423688342
 OWNER_ID = 1130455970494025860
-
-# Developer Role
-DEVELOPER_ROLE_ID = 1448989145740480605
-
-# Mute Role
 MUTED_ROLE_NAME = "Muted"
 
 WELCOME_GIF = (
@@ -37,22 +32,6 @@ WELCOME_GIF = (
     "welcome.gif?ex=6ab2f55f&is=6ab1a3df&"
     "hm=612d5cdf1190d53382436a598c1d313a918b6b1b25bc93ac905d5cfd8ffd1780&"
 )
-
-# =========================================================
-# COLOR ROLE IDs
-# =========================================================
-
-COLOR_ROLES = {
-    "friendsfcolor": 1550035593239461888,
-    "botcolor": 1448989146885652603,
-    "_color": 1491385293457330229,
-    "trustcolor": 1448989152379932773,
-    "siscolor": 1448989144410886145,
-    "brocolor": 1448989153667711069,
-    "xrcolor": 1451268943548383406,
-    "friendscolor": 1448989154578010238,
-    "devcolor": DEVELOPER_ROLE_ID
-}
 
 # =========================================================
 # GET / CREATE MUTED ROLE
@@ -387,33 +366,48 @@ async def seuafraaaRyaaa(ctx):
         await ctx.send("❌ بۆتەکە Manage Roles ـی نییە یان ڕۆڵەکان لە سەرووی ڕۆڵی بۆتەکەن.", delete_after=6)
 
 # =========================================================
-# SLASH COMMAND: /rolecolor (COLOR SYSTEM)
+# FULLY DYNAMIC AUTOCOMPLETE (BY 'color' in role name)
 # =========================================================
 
-@bot.tree.command(name="rolecolor", description="گۆڕینی ڕەنگی ڕۆڵە دیاریکراوەکان بە Hex Code")
+async def color_role_autocomplete(
+    interaction: discord.Interaction,
+    current: str
+) -> list[app_commands.Choice[str]]:
+    choices = []
+    bot_member = interaction.guild.me
+    
+    # پشکنینی هەموو ڕۆڵەکانی سێرڤەر بە شێوەیەکی خۆکار
+    for role in interaction.guild.roles:
+        # مەرج: دەبێت وشەی 'color' لە ناو ڕۆڵەکەدا هەبێت (یان دەتوانیت ئەم مەرجە لابدەیت ئەگەر هەموو ڕۆڵەکانت ڕەنگ بن)
+        # هەروەها نابێت ڕۆڵی بەرزتر یان ڕۆڵی بۆتەکە بێت کە بۆت ناتوانێت دەستکاری بکات
+        if "color" in role.name.lower() and role != interaction.guild.default_role:
+            if bot_member and role < bot_member.top_role:
+                if current.lower() in role.name.lower():
+                    choices.append(app_commands.Choice(name=role.name, value=str(role.id)))
+                    
+    return choices[:25]
+
+# =========================================================
+# SLASH COMMAND: /rolecolor (100% AUTOMATIC)
+# =========================================================
+
+@bot.tree.command(name="rolecolor", description="گۆڕینی ڕەنگی ڕۆڵەکان بە شێوەی خۆکار")
 @app_commands.describe(
-    role_name="ناوی ئەو ڕۆڵەی دەتەوێت ڕەنگەکەی بگۆڕیت",
+    role_id="ئەو ڕۆڵەی دەتەوێت ڕەنگەکەی بگۆڕیت هەڵبژێرە",
     color="ڕەنگی نوێ بە شێوەی هێکس (نموونە: #ff0000)"
 )
-@app_commands.choices(role_name=[
-    app_commands.Choice(name="Friends F Color", value="friendsfcolor"),
-    app_commands.Choice(name="Bot Color", value="botcolor"),
-    app_commands.Choice(name="_ Color", value="_color"),
-    app_commands.Choice(name="Trust Color", value="trustcolor"),
-    app_commands.Choice(name="Sis Color", value="siscolor"),
-    app_commands.Choice(name="Bro Color", value="brocolor"),
-    app_commands.Choice(name="XR Color", value="xrcolor"),
-    app_commands.Choice(name="Friends Color", value="friendscolor"),
-    app_choice_dev := app_commands.Choice(name="Dev Color", value="devcolor"),
-])
-async def rolecolor(interaction: discord.Interaction, role_name: str, color: str):
+@app_commands.autocomplete(role_id=color_role_autocomplete)
+async def rolecolor(interaction: discord.Interaction, role_id: str, color: str):
     await interaction.response.defer(ephemeral=True)
 
-    role_id = COLOR_ROLES.get(role_name)
-    role = interaction.guild.get_role(role_id)
-    
+    try:
+        r_id = int(role_id)
+    except ValueError:
+        return await interaction.followup.send("❌ ئایدی ڕۆڵەکە دروست نییە.", ephemeral=True)
+
+    role = interaction.guild.get_role(r_id)
     if role is None:
-        return await interaction.followup.send("❌ ڕۆڵەکە لەم سێرڤەرەدا نەدۆزرایەوە.", ephemeral=True)
+        return await interaction.followup.send("❌ ئەم ڕۆڵە نەدۆزرایەوە یان سڕاوەتەوە.", ephemeral=True)
 
     if role not in interaction.user.roles:
         return await interaction.followup.send("❌ تۆ خاوەنی ئەم ڕۆڵە نییە بۆ ئەوەی ڕەنگەکەی بگۆڕیت.", ephemeral=True)
