@@ -1,7 +1,7 @@
 import os
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 
 # =========================================================
 # INTENTS
@@ -24,6 +24,11 @@ bot = commands.Bot(
 
 WELCOME_CHANNEL_ID = 1550619956423688342
 OWNER_ID = 1130455970494025860
+
+# Developer Role
+DEVELOPER_ROLE_ID = 1448989145740480605
+
+# Mute Role
 MUTED_ROLE_NAME = "Muted"
 
 WELCOME_GIF = (
@@ -32,6 +37,21 @@ WELCOME_GIF = (
     "welcome.gif?ex=6ab2f55f&is=6ab1a3df&"
     "hm=612d5cdf1190d53382436a598c1d313a918b6b1b25bc93ac905d5cfd8ffd1780&"
 )
+
+# =========================================================
+# COLOR ROLE IDs
+# =========================================================
+
+COLOR_ROLES = {
+    "friendsfcolor": 1550035593239461888,
+    "botcolor": 1448989146885652603,
+    "_color": 1491385293457330229,
+    "trustcolor": 1448989152379932773,
+    "siscolor": 1448989144410886145,
+    "brocolor": 1448989153667711069,
+    "xrcolor": 1451268943548383406,
+    "friendscolor": 1448989154578010238
+}
 
 # =========================================================
 # GET / CREATE MUTED ROLE
@@ -65,14 +85,16 @@ async def get_muted_role(guild):
 @bot.event
 async def on_ready():
     print(f"Bot is online as {bot.user}")
-    try:
-        await bot.tree.sync()
-        print("Slash commands synced successfully.")
-    except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
 
     for guild in bot.guilds:
         await get_muted_role(guild)
+
+    # Sync Slash Commands
+    try:
+        await bot.tree.sync()
+        print("Slash commands synced.")
+    except Exception as e:
+        print(f"Slash command sync error: {e}")
 
 # =========================================================
 # MEMBER JOIN
@@ -366,74 +388,236 @@ async def seuafraaaRyaaa(ctx):
         await ctx.send("❌ بۆتەکە Manage Roles ـی نییە یان ڕۆڵەکان لە سەرووی ڕۆڵی بۆتەکەن.", delete_after=6)
 
 # =========================================================
-# FULLY DYNAMIC AUTOCOMPLETE (BY 'color' in role name)
+# COLOR SYSTEM
 # =========================================================
 
-async def color_role_autocomplete(
-    interaction: discord.Interaction,
-    current: str
-) -> list[app_commands.Choice[str]]:
-    choices = []
-    bot_member = interaction.guild.me
-    
-    # پشکنینی هەموو ڕۆڵەکانی سێرڤەر بە شێوەیەکی خۆکار
-    for role in interaction.guild.roles:
-        # مەرج: دەبێت وشەی 'color' لە ناو ڕۆڵەکەدا هەبێت (یان دەتوانیت ئەم مەرجە لابدەیت ئەگەر هەموو ڕۆڵەکانت ڕەنگ بن)
-        # هەروەها نابێت ڕۆڵی بەرزتر یان ڕۆڵی بۆتەکە بێت کە بۆت ناتوانێت دەستکاری بکات
-        if "color" in role.name.lower() and role != interaction.guild.default_role:
-            if bot_member and role < bot_member.top_role:
-                if current.lower() in role.name.lower():
-                    choices.append(app_commands.Choice(name=role.name, value=str(role.id)))
-                    
-    return choices[:25]
-
-# =========================================================
-# SLASH COMMAND: /rolecolor (100% AUTOMATIC)
-# =========================================================
-
-@bot.tree.command(name="rolecolor", description="گۆڕینی ڕەنگی ڕۆڵەکان بە شێوەی خۆکار")
-@app_commands.describe(
-    role_id="ئەو ڕۆڵەی دەتەوێت ڕەنگەکەی بگۆڕیت هەڵبژێرە",
-    color="ڕەنگی نوێ بە شێوەی هێکس (نموونە: #ff0000)"
-)
-@app_commands.autocomplete(role_id=color_role_autocomplete)
-async def rolecolor(interaction: discord.Interaction, role_id: str, color: str):
-    await interaction.response.defer(ephemeral=True)
-
-    try:
-        r_id = int(role_id)
-    except ValueError:
-        return await interaction.followup.send("❌ ئایدی ڕۆڵەکە دروست نییە.", ephemeral=True)
-
-    role = interaction.guild.get_role(r_id)
+async def change_role_color(ctx, command_name, role_id, color):
+    role = ctx.guild.get_role(role_id)
     if role is None:
-        return await interaction.followup.send("❌ ئەم ڕۆڵە نەدۆزرایەوە یان سڕاوەتەوە.", ephemeral=True)
+        await ctx.send("❌ ڕۆڵەکە نەدۆزرایەوە لە سێرڤەرەکەدا.", delete_after=5)
+        return
 
-    if role not in interaction.user.roles:
-        return await interaction.followup.send("❌ تۆ خاوەنی ئەم ڕۆڵە نییە بۆ ئەوەی ڕەنگەکەی بگۆڕیت.", ephemeral=True)
+    if role not in ctx.author.roles:
+        await ctx.send("❌ تۆ ئەم ڕۆڵەت نییە بۆ ئەوەی ڕەنگەکەی بگۆڕیت.", delete_after=5)
+        return
+
+    if color is None:
+        await ctx.send(f"❌ ڕەنگەکە بنووسە.\nنموونە: `{command_name} #000000`", delete_after=5)
+        return
 
     if not color.startswith("#") or len(color) != 7:
-        return await interaction.followup.send("❌ ڕەنگەکە دەبێت بە شێوەی هەڵبژاردەی `#000000` بێت.", ephemeral=True)
+        await ctx.send("❌ ڕەنگەکە دەبێت بە شێوەی `#000000` بێت.", delete_after=5)
+        return
 
     try:
         new_color = discord.Colour.from_str(color)
     except ValueError:
-        return await interaction.followup.send("❌ ئەم Hex Color ـە دروست نییە.", ephemeral=True)
+        await ctx.send("❌ ئەم Hex Color ـە دروست نییە.", delete_after=5)
+        return
 
-    bot_member = interaction.guild.me
+    bot_member = ctx.guild.me
     if bot_member is None:
         return
 
     if role >= bot_member.top_role:
-        return await interaction.followup.send("❌ ناتوانم ئەم ڕۆڵە بگۆڕم چونکە لە سەرووی ڕۆڵی بۆتەکەوەیە.", ephemeral=True)
+        await ctx.send("❌ ڕۆڵەکە دەبێت لە خوار ڕۆڵی بۆتەکە بێت.", delete_after=5)
+        return
 
     try:
-        await role.edit(colour=new_color, reason=f"Color changed by {interaction.user}")
-        await interaction.followup.send(f"✅ ڕەنگی ڕۆڵی **{role.name}** بە سەرکەوتوویی گۆڕدرا بۆ `{color.upper()}`.", ephemeral=True)
+        await role.edit(colour=new_color, reason=f"Color changed by {ctx.author}")
+        try:
+            await ctx.message.delete()
+        except:
+            pass
+        msg = await ctx.send(f"✅ ڕەنگی `{command_name}` گۆڕدرا بۆ `{color.upper()}`.")
+        await msg.delete(delay=5)
     except discord.Forbidden:
-        await interaction.followup.send("❌ بۆتەکە دەسەڵاتی دەستکاریکردنی ئەم ڕۆڵەی نییە.", ephemeral=True)
+        await ctx.send("❌ بۆتەکە ناتوانێت ئەم ڕۆڵە دەستکاری بکات.", delete_after=5)
     except discord.HTTPException:
-        await interaction.followup.send("❌ هەڵەیەک لە Discord ڕوویدا.", ephemeral=True)
+        await ctx.send("❌ هەڵەیەک لە Discord ڕوویدا.", delete_after=5)
+
+# =========================================================
+# COLOR COMMANDS
+# =========================================================
+
+@bot.command(name="friendsfcolor")
+async def friendsfcolor(ctx, color: str = None):
+    await change_role_color(ctx, "friendsfcolor", COLOR_ROLES["friendsfcolor"], color)
+
+@bot.command(name="botcolor")
+async def botcolor(ctx, color: str = None):
+    await change_role_color(ctx, "botcolor", COLOR_ROLES["botcolor"], color)
+
+@bot.command(name="_color")
+async def _color(ctx, color: str = None):
+    await change_role_color(ctx, "_color", COLOR_ROLES["_color"], color)
+
+@bot.command(name="trustcolor")
+async def trustcolor(ctx, color: str = None):
+    await change_role_color(ctx, "trustcolor", COLOR_ROLES["trustcolor"], color)
+
+@bot.command(name="siscolor")
+async def siscolor(ctx, color: str = None):
+    await change_role_color(ctx, "siscolor", COLOR_ROLES["siscolor"], color)
+
+@bot.command(name="brocolor")
+async def brocolor(ctx, color: str = None):
+    await change_role_color(ctx, "brocolor", COLOR_ROLES["brocolor"], color)
+
+@bot.command(name="xrcolor")
+async def xrcolor(ctx, color: str = None):
+    await change_role_color(ctx, "xrcolor", COLOR_ROLES["xrcolor"], color)
+
+@bot.command(name="friendscolor")
+async def friendscolor(ctx, color: str = None):
+    await change_role_color(ctx, "friendscolor", COLOR_ROLES["friendscolor"], color)
+
+@bot.command(name="devcolor")
+async def devcolor(ctx, color: str = None):
+    developer_role = ctx.guild.get_role(DEVELOPER_ROLE_ID)
+    if developer_role is None:
+        await ctx.send("❌ Developer role نەدۆزرایەوە.", delete_after=5)
+        return
+    if developer_role not in ctx.author.roles:
+        await ctx.send("❌ تۆ ڕۆڵی Developer ـت نییە.", delete_after=5)
+        return
+    await change_role_color(ctx, "devcolor", DEVELOPER_ROLE_ID, color)
+
+# =========================================================
+# /rangi-role - DYNAMIC ROLE AUTOCOMPLETE
+# =========================================================
+
+async def role_autocomplete(
+    interaction: discord.Interaction,
+    current: str
+):
+    guild = interaction.guild
+
+    if guild is None:
+        return []
+
+    current = current.lower()
+
+    roles = [
+        role
+        for role in guild.roles
+        if role != guild.default_role
+        and not role.managed
+        and current in role.name.lower()
+    ]
+
+    roles.sort(key=lambda r: r.position, reverse=True)
+
+    return [
+        app_commands.Choice(
+            name=role.name[:100],
+            value=str(role.id)
+        )
+        for role in roles[:25]
+    ]
+
+
+@bot.tree.command(
+    name="rangi-role",
+    description="گۆڕینی ڕەنگی ڕۆڵ"
+)
+@app_commands.describe(
+    role="ڕۆڵەکە هەڵبژێرە",
+    color="Hex color وەک #FF0000"
+)
+@app_commands.autocomplete(role=role_autocomplete)
+async def rangi_role(
+    interaction: discord.Interaction,
+    role: str,
+    color: str
+):
+    guild = interaction.guild
+
+    if guild is None:
+        return await interaction.response.send_message(
+            "❌ ئەم فرمانە تەنها لە سێرڤەر کار دەکات.",
+            ephemeral=True
+        )
+
+    try:
+        role_id = int(role)
+    except ValueError:
+        return await interaction.response.send_message(
+            "❌ ڕۆڵێکی دروست هەڵبژێرە.",
+            ephemeral=True
+        )
+
+    target_role = guild.get_role(role_id)
+
+    if target_role is None:
+        return await interaction.response.send_message(
+            "❌ ئەو ڕۆڵە لە سێرڤەرەکەدا نەدۆزرایەوە.",
+            ephemeral=True
+        )
+
+    if target_role.managed:
+        return await interaction.response.send_message(
+            "❌ ناتوانیت ڕەنگی ئەم ڕۆڵە بگۆڕیت.",
+            ephemeral=True
+        )
+
+    # User must have the selected role
+    if target_role not in interaction.user.roles:
+        return await interaction.response.send_message(
+            "❌ تۆ ئەم ڕۆڵەت نییە بۆ ئەوەی ڕەنگەکەی بگۆڕیت.",
+            ephemeral=True
+        )
+
+    if not color.startswith("#") or len(color) != 7:
+        return await interaction.response.send_message(
+            "❌ ڕەنگەکە دەبێت بە شێوەی `#000000` بێت.",
+            ephemeral=True
+        )
+
+    try:
+        new_color = discord.Colour.from_str(color)
+    except ValueError:
+        return await interaction.response.send_message(
+            "❌ ئەم Hex Color ـە دروست نییە.",
+            ephemeral=True
+        )
+
+    bot_member = guild.me
+
+    if bot_member is None:
+        return await interaction.response.send_message(
+            "❌ نەتوانرا بۆتەکە بدۆزرێتەوە.",
+            ephemeral=True
+        )
+
+    if target_role >= bot_member.top_role:
+        return await interaction.response.send_message(
+            "❌ ڕۆڵەکە دەبێت لە خوار ڕۆڵی بۆتەکە بێت.",
+            ephemeral=True
+        )
+
+    try:
+        await target_role.edit(
+            colour=new_color,
+            reason=f"Role color changed by {interaction.user}"
+        )
+
+        await interaction.response.send_message(
+            f"✅ ڕەنگی `{target_role.name}` گۆڕدرا بۆ `{color.upper()}`.",
+            ephemeral=True
+        )
+
+    except discord.Forbidden:
+        await interaction.response.send_message(
+            "❌ بۆتەکە ناتوانێت ئەم ڕۆڵە دەستکاری بکات.",
+            ephemeral=True
+        )
+
+    except discord.HTTPException:
+        await interaction.response.send_message(
+            "❌ هەڵەیەک لە Discord ڕوویدا.",
+            ephemeral=True
+        )
 
 # =========================================================
 # COMMAND ERRORS
