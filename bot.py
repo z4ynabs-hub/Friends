@@ -208,7 +208,7 @@ async def mute(ctx, member: discord.Member = None):
         except:
             pass
 
-        msg = await ctx.send(f"🔇 {member.mention} mute کرا.")
+        msg = await ctx.send(f"🔇 {member.mention} Mute kraaaa")
         await msg.delete(delay=5)
 
     except discord.Forbidden:
@@ -259,7 +259,7 @@ async def unmute(ctx, member: discord.Member = None):
         except:
             pass
 
-        msg = await ctx.send(f"🔊 {member.mention} mute لادرا.")
+        msg = await ctx.send(f"🔊 {member.mention} unmute kraa")
         await msg.delete(delay=5)
 
     except discord.Forbidden:
@@ -378,9 +378,14 @@ async def rangi_role_autocomplete(
     if not guild:
         return []
     
+    # Get all roles the user actually has or that are below/equal to the user's top role
+    user = guild.get_member(interaction.user.id)
+    if not user:
+        return []
+
     roles = [
         role for role in guild.roles 
-        if role != guild.default_role and not role.managed
+        if role != guild.default_role and not role.managed and (interaction.user.id == guild.owner_id or role <= user.top_role)
     ]
     
     filtered = [
@@ -391,7 +396,7 @@ async def rangi_role_autocomplete(
     
     return filtered[:25]
 
-@bot.tree.command(name="rangi-role", description="گۆڕینی ڕەنگی ڕۆڵ (تەنها بۆ ادمین)")
+@bot.tree.command(name="rangi-role", description="گۆڕینی ڕەنگی ڕۆڵی خۆت یان ڕۆڵەکانی خوار خۆت (تەنها بۆ ادمین)")
 @discord.app_commands.describe(
     role="ڕۆڵەکە هەڵبژێرە",
     color="ڕەنگی نوێ بە شێوەی Hex (بۆ نموونە: #FF0000)"
@@ -414,9 +419,9 @@ async def rangi_role(interaction: discord.Interaction, role: str, color: str):
     if target_role is None:
         return await interaction.followup.send("❌ ڕۆڵەکە لە سێرڤەرەکەدا نەدۆزرایەوە یان سڕاوەتەوە.")
 
-    # Check if target role is higher than or equal to admin's top role (unless owner)
-    if interaction.user.id != guild.owner_id and target_role >= interaction.user.top_role:
-        return await interaction.followup.send("❌ ناتوانیت ڕەنگی ڕۆڵێک بگۆڕیت کە یەکسانە یان بەرزترە لە ڕۆڵی خۆت.")
+    # Allow changing own role or roles below the admin's top role
+    if interaction.user.id != guild.owner_id and target_role > interaction.user.top_role:
+        return await interaction.followup.send("❌ ناتوانیت ڕەنگی ڕۆڵێک بگۆڕیت کە لە ڕۆڵی خۆت بەرزترە.")
 
     # Validate Hex Color format
     if not color.startswith("#") or len(color) != 7:
