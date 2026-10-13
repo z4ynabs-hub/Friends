@@ -335,7 +335,7 @@ async def unlock(ctx):
 # =========================================================
 
 @bot.command()
-async def seuafraaaRyaaa(ctx):
+async def fraaayidaaa(ctx):
     if ctx.author.id != OWNER_ID:
         return
 
